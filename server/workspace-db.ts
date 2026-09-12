@@ -56,6 +56,14 @@ export async function getMaintenanceSchedule() {
   return result[0];
 }
 
+export async function getMaintenanceStatus() {
+  const db = await getDb();
+  if (!db) return { schedule: undefined, lastRun: undefined };
+  const schedule = await getMaintenanceSchedule();
+  const runs = await db.select().from(maintenanceRuns).orderBy(desc(maintenanceRuns.startedAt)).limit(1);
+  return { schedule, lastRun: runs[0] };
+}
+
 export async function saveMaintenanceTaskUid(taskUid: string) {
   const db = await getDb();
   if (!db) return;

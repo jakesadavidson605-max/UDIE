@@ -10,7 +10,7 @@ import { ingestDocument, ingestUrl } from "./ingestion";
 import { hybridSearch } from "./memory";
 import { runSandboxWithHealing } from "./sandbox";
 import { listGateways, upsertGateway } from "./memory-db";
-import { appendThreadMessage, createThread, getOrCreateWorkspace, getOwnedThread, listThreadMessages, listUserThreads } from "./workspace-db";
+import { appendThreadMessage, createThread, getMaintenanceStatus, getOrCreateWorkspace, getOwnedThread, listThreadMessages, listUserThreads, saveMaintenanceTaskUid } from "./workspace-db";
 import { createHeartbeatJob } from "./_core/heartbeat";
 import { parse as parseCookie } from "cookie";
 
@@ -49,9 +49,12 @@ export const appRouter = router({
       if (!thread) return [];
       return listThreadMessages(ctx.user.id, input.threadId);
     }),
+    maintenanceStatus: protectedProcedure.query(() => getMaintenanceStatus()),
     scheduleMaintenance: protectedProcedure.input(z.object({ cron: z.string().regex(/^\d+\s+\d+\s+\d+\s+\S+\s+\S+\s+\S+$/).default("0 0 3 * * *") })).mutation(async ({ ctx, input }) => {
       const session = parseCookie(ctx.req.headers.cookie ?? "")[COOKIE_NAME] ?? "";
-      return createHeartbeatJob({ name: "udie-memory-maintenance", cron: input.cron, path: "/api/scheduled/memory-maintenance", description: "Nightly UDIE memory deduplication, conflict resolution, and vector re-indexing" }, session);
+      const job = await createHeartbeatJob({ name: "udie-memory-maintenance", cron: input.cron, path: "/api/scheduled/memory-maintenance", description: "Nightly UDIE memory deduplication, conflict resolution, and vector re-indexing" }, session);
+      await saveMaintenanceTaskUid(job.taskUid);
+      return job;
     }),
   }),
   udie: router({
