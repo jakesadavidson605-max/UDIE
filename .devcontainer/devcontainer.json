@@ -1,0 +1,17 @@
+{
+  "name": "UDIE Android",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "22" },
+    "ghcr.io/devcontainers/features/java:1": { "version": "21" },
+    "ghcr.io/devcontainers/features/android-sdk:2": {
+      "platforms": "android-36",
+      "buildTools": "36.0.0",
+      "ndk": "none"
+    }
+  },
+  "postCreateCommand": "corepack enable && pnpm install",
+  "remoteEnv": {
+    "JAVA_HOME": "/usr/lib/jvm/msopenjdk-current"
+  }
+}

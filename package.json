@@ -10,11 +10,19 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "cap:sync": "pnpm build:web && cap sync android",
+    "build:web": "vite build",
+    "android:open": "cap open android",
+    "android:debug": "pnpm cap:sync && cd android && ./gradlew assembleDebug",
+    "android:release": "pnpm cap:sync && cd android && ./gradlew bundleRelease && ./gradlew assembleRelease",
+    "android:build": "bash scripts/build-android.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
     "@aws-sdk/s3-request-presigner": "^3.693.0",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -80,6 +88,7 @@
   },
   "devDependencies": {
     "@builder.io/vite-plugin-jsx-loc": "^0.1.1",
+    "@capacitor/cli": "^8.5.2",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.1.3",
     "@types/express": "4.17.21",

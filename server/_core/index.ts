@@ -35,6 +35,18 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    const allowed = Boolean(origin) && (origin === "capacitor://localhost" || origin === "http://localhost" || origin === "http://localhost:5173" || origin === process.env.VITE_NATIVE_ORIGIN);
+    if (allowed) {
+      res.setHeader("Access-Control-Allow-Origin", origin as string);
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    }
+    if (req.method === "OPTIONS") return res.sendStatus(204);
+    next();
+  });
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   app.post("/api/scheduled/memory-maintenance", memoryMaintenanceHandler);
