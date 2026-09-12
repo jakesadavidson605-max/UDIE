@@ -79,6 +79,13 @@ async function syncToChroma(chunks: Array<{ id: string; content: string; metadat
   }
 }
 
+export async function reindexChroma() {
+  const stored = await listStoredMemory(5000);
+  if (stored.length === 0) return { synced: false, count: 0, reason: "No stored chunks" };
+  const result = await syncToChroma(stored.map(chunk => ({ id: chunk.id, content: chunk.content, metadata: { documentId: chunk.documentId, title: `Memory chunk ${chunk.chunkIndex + 1}`, sourceUrl: "" } })));
+  return { ...result, count: stored.length };
+}
+
 async function queryChroma(query: string, limit: number): Promise<SearchHit[]> {
   const endpoint = process.env.CHROMA_URL;
   if (!endpoint) return [];

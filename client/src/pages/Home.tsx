@@ -1,5 +1,5 @@
 import { Streamdown } from "streamdown";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   ArrowUp,
@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { IntegrationDrawer } from "@/components/IntegrationDrawer";
+import { useAuth } from "@/_core/hooks/useAuth";
 
 type Panel = "memory" | "agents" | "system";
 type ChatMessage = { role: "user" | "assistant"; content: string; source?: string; warning?: string | null; events?: { agent: string; status: string; detail: string; durationMs: number }[]; citations?: { label: string; href: string; citation: string }[] };
@@ -153,8 +154,10 @@ function ControlPanel({ activePanel, setActivePanel, temperature, setTemperature
 }
 
 export default function Home() {
+  const { isAuthenticated } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
+  const [threadId, setThreadId] = useState<string | undefined>();
   const [integrationsOpen, setIntegrationsOpen] = useState(false);
   const [activePanel, setActivePanel] = useState<Panel>("memory");
   const [mode, setMode] = useState<"hybrid" | "local" | "cloud">("hybrid");
@@ -163,8 +166,15 @@ export default function Home() {
   const [prompt, setPrompt] = useState("You are an objective analytical intelligence engine. Prioritize clarity, evidence, and explicit uncertainty.");
   const [sandboxOutput, setSandboxOutput] = useState<{ ok: boolean; summary: string; output: string; metrics: { lines: number; duration: string; memory: string } } | null>(null);
   const memoryInput = useMemo(() => ({ query: "" }), []);
+  const { data: threads } = trpc.workspace.threads.useQuery(undefined, { enabled: isAuthenticated });
+  const createThread = trpc.workspace.createThread.useMutation({ onSuccess: thread => setThreadId(thread.id) });
   const { data: nodes = [] } = trpc.udie.memory.useQuery(memoryInput);
   const { data: agents } = trpc.udie.agents.useQuery();
+  useEffect(() => {
+    if (!isAuthenticated || threadId || createThread.isPending || threads === undefined) return;
+    if (threads[0]) setThreadId(threads[0].id);
+    else createThread.mutate({ title: "Untitled intelligence thread", mode });
+  }, [createThread, isAuthenticated, mode, threadId, threads]);
   const chat = trpc.udie.chat.useMutation({
     onSuccess: data => setMessages(previous => [...previous, { role: "assistant", content: data.content, source: data.source, warning: data.warning, events: data.events, citations: data.citations }]),
     onError: () => { setMessages(previous => [...previous, { role: "assistant", content: "The orchestration request could not be completed. Check the gateway configuration and retry." }]); toast.error("Orchestration request failed"); },
@@ -175,7 +185,7 @@ export default function Home() {
     if (!message || chat.isPending) return;
     setMessages(previous => [...previous, { role: "user", content: message }]);
     setDraft("");
-    chat.mutate({ message, mode, prompt, temperature, topP });
+    chat.mutate({ message, mode, prompt, temperature, topP, threadId });
   };
   const resetThread = () => { setMessages(initialMessages); setDraft(""); toast.success("Fresh intelligence thread created"); };
 

@@ -7,8 +7,8 @@ export type GatewayMessage = { role: "system" | "user" | "assistant"; content: s
 
 const defaults: GatewayConfig[] = [
   { provider: "builtin", label: "Built-in gateway", model: process.env.UDIE_BUILTIN_MODEL ?? "default", enabled: true },
-  { provider: "ollama", label: "Local Ollama", endpoint: process.env.UDIE_OLLAMA_URL ?? "http://127.0.0.1:11434", model: process.env.UDIE_OLLAMA_MODEL ?? "llama3.1", enabled: Boolean(process.env.UDIE_OLLAMA_URL) },
-  { provider: "vllm", label: "Local vLLM", endpoint: process.env.UDIE_VLLM_URL ?? "http://127.0.0.1:8000", model: process.env.UDIE_VLLM_MODEL ?? "Qwen/Qwen2.5-7B-Instruct", enabled: Boolean(process.env.UDIE_VLLM_URL) },
+  { provider: "ollama", label: "Local Ollama", endpoint: process.env.UDIE_OLLAMA_URL ?? "http://localhost:11434", model: process.env.UDIE_OLLAMA_MODEL ?? "llama3.1", enabled: Boolean(process.env.UDIE_OLLAMA_URL) },
+  { provider: "vllm", label: "Local vLLM", endpoint: process.env.UDIE_VLLM_URL ?? "http://localhost:8000", model: process.env.UDIE_VLLM_MODEL ?? "Qwen/Qwen2.5-7B-Instruct", enabled: Boolean(process.env.UDIE_VLLM_URL) },
   { provider: "openrouter", label: "OpenRouter", endpoint: "https://openrouter.ai/api/v1", model: process.env.UDIE_OPENROUTER_MODEL ?? "openai/gpt-4o-mini", enabled: Boolean(process.env.OPENROUTER_API_KEY) },
   { provider: "openai", label: "OpenAI", endpoint: "https://api.openai.com/v1", model: process.env.UDIE_OPENAI_MODEL ?? "gpt-4o-mini", enabled: Boolean(process.env.OPENAI_API_KEY) },
   { provider: "anthropic", label: "Anthropic", endpoint: "https://api.anthropic.com/v1", model: process.env.UDIE_ANTHROPIC_MODEL ?? "claude-3-5-sonnet-latest", enabled: Boolean(process.env.ANTHROPIC_API_KEY) },

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import { demoAgents, demoMemory } from "./udie";
 import { orchestrate } from "./agents";
 import { discoverBuiltinModels, listConfiguredGateways } from "./gateways";
@@ -10,6 +10,9 @@ import { ingestDocument, ingestUrl } from "./ingestion";
 import { hybridSearch } from "./memory";
 import { runSandboxWithHealing } from "./sandbox";
 import { listGateways, upsertGateway } from "./memory-db";
+import { appendThreadMessage, createThread, getOrCreateWorkspace, getOwnedThread, listThreadMessages, listUserThreads } from "./workspace-db";
+import { createHeartbeatJob } from "./_core/heartbeat";
+import { parse as parseCookie } from "cookie";
 
 const chatInput = z.object({
   message: z.string().min(1).max(8000),
@@ -18,6 +21,7 @@ const chatInput = z.object({
   temperature: z.number().min(0).max(2),
   topP: z.number().min(0).max(1),
   sandboxCode: z.string().max(12000).optional(),
+  threadId: z.string().optional(),
 });
 
 export const appRouter = router({
@@ -30,9 +34,36 @@ export const appRouter = router({
       return { success: true } as const;
     }),
   }),
+  workspace: router({
+    me: protectedProcedure.query(({ ctx }) => getOrCreateWorkspace(ctx.user.id, ctx.user.name)),
+    threads: protectedProcedure.query(async ({ ctx }) => {
+      const workspace = await getOrCreateWorkspace(ctx.user.id, ctx.user.name);
+      return listUserThreads(ctx.user.id, workspace.id);
+    }),
+    createThread: protectedProcedure.input(z.object({ title: z.string().max(512).default("Untitled intelligence thread"), mode: z.enum(["hybrid", "local", "cloud"]).default("hybrid") })).mutation(async ({ ctx, input }) => {
+      const workspace = await getOrCreateWorkspace(ctx.user.id, ctx.user.name);
+      return createThread(ctx.user.id, workspace.id, input.title, input.mode);
+    }),
+    messages: protectedProcedure.input(z.object({ threadId: z.string().min(1) })).query(async ({ ctx, input }) => {
+      const thread = await getOwnedThread(ctx.user.id, input.threadId);
+      if (!thread) return [];
+      return listThreadMessages(ctx.user.id, input.threadId);
+    }),
+    scheduleMaintenance: protectedProcedure.input(z.object({ cron: z.string().regex(/^\d+\s+\d+\s+\d+\s+\S+\s+\S+\s+\S+$/).default("0 0 3 * * *") })).mutation(async ({ ctx, input }) => {
+      const session = parseCookie(ctx.req.headers.cookie ?? "")[COOKIE_NAME] ?? "";
+      return createHeartbeatJob({ name: "udie-memory-maintenance", cron: input.cron, path: "/api/scheduled/memory-maintenance", description: "Nightly UDIE memory deduplication, conflict resolution, and vector re-indexing" }, session);
+    }),
+  }),
   udie: router({
-    chat: publicProcedure.input(chatInput).mutation(async ({ input }) => {
+    chat: publicProcedure.input(chatInput).mutation(async ({ ctx, input }) => {
       const result = await orchestrate(input);
+      if (ctx.user && input.threadId) {
+        const thread = await getOwnedThread(ctx.user.id, input.threadId);
+        if (thread) {
+          await appendThreadMessage({ threadId: thread.id, ownerId: ctx.user.id, role: "user", content: input.message });
+          await appendThreadMessage({ threadId: thread.id, ownerId: ctx.user.id, role: "assistant", content: result.content, source: result.provider, metadata: { events: result.events, citations: result.citations } });
+        }
+      }
       return { ...result, source: result.provider, warning: result.provider === "local-fallback" ? "Gateway unavailable — deterministic local fallback used." : null };
     }),
     memory: publicProcedure.input(z.object({ query: z.string().default(""), limit: z.number().min(1).max(30).default(8) })).query(async ({ input }) => {
