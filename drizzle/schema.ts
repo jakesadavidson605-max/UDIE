@@ -1,17 +1,7 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -22,7 +12,61 @@ export const users = mysqlTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+export const memoryDocuments = mysqlTable("memoryDocuments", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  title: varchar("title", { length: 512 }).notNull(),
+  sourceUrl: text("sourceUrl"),
+  sourceType: mysqlEnum("sourceType", ["text", "url", "file"]).default("text").notNull(),
+  content: text("content").notNull(),
+  metadata: text("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const memoryChunks = mysqlTable("memoryChunks", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  documentId: varchar("documentId", { length: 64 }).notNull(),
+  chunkIndex: int("chunkIndex").notNull(),
+  content: text("content").notNull(),
+  tokenCount: int("tokenCount").notNull(),
+  keywords: text("keywords"),
+  embedding: text("embedding"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const memoryEdges = mysqlTable("memoryEdges", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  fromId: varchar("fromId", { length: 64 }).notNull(),
+  toId: varchar("toId", { length: 64 }).notNull(),
+  relation: varchar("relation", { length: 128 }).notNull(),
+  weight: int("weight").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const ingestionJobs = mysqlTable("ingestionJobs", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  source: text("source").notNull(),
+  status: mysqlEnum("status", ["queued", "running", "completed", "failed"]).default("queued").notNull(),
+  documentId: varchar("documentId", { length: 64 }),
+  error: text("error"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export const gatewayConfigs = mysqlTable("gatewayConfigs", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  provider: mysqlEnum("provider", ["ollama", "vllm", "openrouter", "openai", "anthropic", "builtin"]).notNull(),
+  label: varchar("label", { length: 128 }).notNull(),
+  endpoint: text("endpoint"),
+  model: varchar("model", { length: 256 }).notNull(),
+  enabled: int("enabled").default(1).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-
-// TODO: Add your tables here
+export type MemoryDocument = typeof memoryDocuments.$inferSelect;
+export type MemoryChunk = typeof memoryChunks.$inferSelect;
+export type MemoryEdge = typeof memoryEdges.$inferSelect;
+export type GatewayConfig = typeof gatewayConfigs.$inferSelect;
