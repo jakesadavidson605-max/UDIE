@@ -10,7 +10,7 @@ function planIntent(message: string) {
   return { intent: lower.includes("code") || lower.includes("run") ? "execution" : lower.includes("research") || lower.includes("source") ? "research" : "analysis", needsRetrieval: !lower.includes("hello"), needsSandbox: lower.includes("run") || lower.includes("execute") || lower.includes("code") };
 }
 
-export async function orchestrate(input: { message: string; mode: GatewayMode; prompt: string; temperature: number; topP: number; sandboxCode?: string }) {
+export async function orchestrate(input: { message: string; mode: GatewayMode; provider?: "ollama" | "vllm" | "openrouter" | "openai" | "anthropic" | "builtin"; apiKey?: string; prompt: string; temperature: number; topP: number; sandboxCode?: string; onToken?: (token: string) => void }) {
   const started = Date.now();
   const events: AgentEvent[] = [];
   const emit = (agent: string, status: AgentEvent["status"], detail: string, at: number) => events.push({ agent, status, detail, durationMs: Date.now() - at });
@@ -34,7 +34,7 @@ export async function orchestrate(input: { message: string; mode: GatewayMode; p
   const messages = [{ role: "system" as const, content: `${input.prompt}\n\nYou are the UDIE Executor. Use the retrieved evidence below. Cite relevant memory records and state what is uncertain.\n\n${context.join("\n\n")}` }, { role: "user" as const, content: input.message }];
   let result: { content: string; provider: string; model: string };
   try {
-    result = await generateWithGateway({ mode: input.mode, messages, temperature: input.temperature, topP: input.topP });
+    result = await generateWithGateway({ mode: input.mode, provider: input.provider, apiKey: input.apiKey, messages, temperature: input.temperature, topP: input.topP, onToken: input.onToken });
   } catch {
     result = { content: buildFallbackAnswer(input.message, input.mode), provider: "local-fallback", model: "deterministic" };
   }

@@ -17,6 +17,8 @@ import { parse as parseCookie } from "cookie";
 const chatInput = z.object({
   message: z.string().min(1).max(8000),
   mode: z.enum(["hybrid", "local", "cloud"]),
+  provider: z.enum(["ollama", "vllm", "openrouter", "openai", "anthropic", "builtin"]).optional(),
+  apiKey: z.string().max(512).optional(),
   prompt: z.string().min(1).max(4000),
   temperature: z.number().min(0).max(2),
   topP: z.number().min(0).max(1),

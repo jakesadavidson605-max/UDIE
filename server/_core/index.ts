@@ -9,6 +9,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { memoryMaintenanceHandler } from "../scheduled";
+import { orchestrate } from "../agents";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -50,6 +51,19 @@ async function startServer() {
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   app.post("/api/scheduled/memory-maintenance", memoryMaintenanceHandler);
+  app.post("/api/udie/chat/stream", async (req, res) => {
+    res.status(200).set({ "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no" });
+    res.flushHeaders();
+    let finished = false;
+    const send = (event: string, data: unknown) => { if (!finished) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+    res.on("close", () => { finished = true; });
+    try {
+      const result = await orchestrate({ ...req.body, onToken: token => send("token", { token }) });
+      if (!finished) { send("complete", { ...result, warning: result.provider === "local-fallback" ? "Gateway unavailable — deterministic local fallback used." : null }); res.end(); }
+    } catch (error) {
+      if (!finished) { send("error", { message: error instanceof Error ? error.message : "Streaming orchestration failed" }); res.end(); }
+    }
+  });
   // tRPC API
   app.use(
     "/api/trpc",
