@@ -194,10 +194,12 @@ export default function Home() {
     setMessages(previous => [...previous, { role: "assistant", content: "", source: mode === "cloud" ? "openrouter" : undefined }]);
     setDraft("");
     setStreaming(true);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 45000);
     try {
       let apiKey: string | undefined;
       try { apiKey = localStorage.getItem("udie.cloudApiKey") || undefined; } catch { apiKey = undefined; }
-      const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")}/api/udie/chat/stream`, { method: "POST", headers: { "content-type": "application/json" }, credentials: "include", body: JSON.stringify({ message, mode, provider: mode === "cloud" ? "openrouter" : undefined, apiKey: mode === "cloud" ? apiKey : undefined, prompt, temperature, topP, threadId }) });
+      const response = await fetch(`${(import.meta.env.VITE_API_BASE_URL ?? "").replace(/\/$/, "")}/api/udie/chat/stream`, { method: "POST", headers: { "content-type": "application/json" }, credentials: "include", signal: controller.signal, body: JSON.stringify({ message, mode, provider: mode === "cloud" ? "openrouter" : undefined, apiKey: mode === "cloud" ? apiKey : undefined, prompt, temperature, topP, threadId }) });
       if (!response.ok || !response.body) throw new Error(`Streaming request failed (${response.status})`);
       const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = "";
       const updateAssistant = (patch: Partial<ChatMessage>) => setMessages(previous => previous.map((item, index) => index === assistantIndex ? { ...item, ...patch } : item));
@@ -215,8 +217,8 @@ export default function Home() {
         }
         if (done) break;
       }
-    } catch (error) { setMessages(previous => previous.map((item, index) => index === assistantIndex ? { ...item, content: "The orchestration request could not be completed. Check the gateway configuration and retry." } : item)); toast.error(error instanceof Error ? error.message : "Orchestration request failed"); }
-    finally { setStreaming(false); }
+    } catch (error) { const timedOut = error instanceof DOMException && error.name === "AbortError"; const message = timedOut ? "The gateway took too long to respond. Check your Cloud API key or gateway status, then retry." : "The orchestration request could not be completed. Check the gateway configuration and retry."; setMessages(previous => previous.map((item, index) => index === assistantIndex ? { ...item, content: message } : item)); toast.error(message); }
+    finally { window.clearTimeout(timeoutId); setStreaming(false); }
   };
   const resetThread = () => { setDraft(""); if (isAuthenticated) createThread.mutate({ title: "Untitled intelligence thread", mode }); else { setMessages(initialMessages); toast.success("Fresh intelligence thread created"); } };
 
