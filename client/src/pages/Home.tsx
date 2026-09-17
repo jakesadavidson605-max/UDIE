@@ -203,7 +203,9 @@ export default function Home() {
       const updateAssistant = (patch: Partial<ChatMessage>) => setMessages(previous => previous.map((item, index) => index === assistantIndex ? { ...item, ...patch } : item));
       while (true) {
         const { done, value } = await reader.read(); buffer += decoder.decode(value ?? new Uint8Array(), { stream: !done });
+        buffer = buffer.replace(/\r\n/g, "\n");
         const blocks = buffer.split(/\n\n/); buffer = blocks.pop() ?? "";
+        if (done && buffer.trim()) { blocks.push(buffer); buffer = ""; }
         for (const block of blocks) {
           const event = block.match(/^event: (.+)$/m)?.[1]; const payload = block.match(/^data: (.+)$/m)?.[1]; if (!event || !payload) continue;
           const data = JSON.parse(payload) as { token?: string; content?: string; provider?: string; warning?: string | null; events?: ChatMessage["events"]; citations?: ChatMessage["citations"]; message?: string };
